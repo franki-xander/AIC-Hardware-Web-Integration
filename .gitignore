@@ -8,3 +8,7 @@ desktop.ini
 
 # Standard logs
 *.log
+
+# Development environments
+.vscode/
+.idea/
