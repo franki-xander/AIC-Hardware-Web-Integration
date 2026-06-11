@@ -1,0 +1,10 @@
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Vercel deployment local targets
+.vercel/
+
+# Standard logs
+*.log

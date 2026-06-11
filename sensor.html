@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensor Analytics & Remote Controls</title>
+  <link rel="stylesheet" href="css/style.css">
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div>
+        <h1>Sensor Identity: <span id="display-sensor-id">Loading...</span></h1>
+        <p class="subtitle">Dynamic analytical data streaming straight from cloud telemetry</p>
+      </div>
+      <div>
+        <a href="/" class="btn">&larr; Back to Fleet Hub</a>
+      </div>
+    </header>
+
+    <section class="grid-fleet" style="margin-bottom: 2rem;">
+      <div class="card">
+        <p class="metric-label">Latest Readout Temperature</p>
+        <h2 class="metric-value" id="live-temp">...°C</h2>
+      </div>
+      <div class="card">
+        <p class="metric-label">Latest Readout Humidity</p>
+        <h2 class="metric-value" id="live-humid">...%</h2>
+      </div>
+    </section>
+
+    <section class="control-panel">
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button class="btn" data-window="2">2 Hours</button>
+        <button class="btn" data-window="12">12 Hours</button>
+        <button class="btn" data-window="24">24 Hours</button>
+        <button class="btn" class="btn btn-active" data-window="48">48 Hours</button>
+      </div>
+      
+      <form id="interval-form" style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
+        <label for="interval-input" style="font-size: 0.9rem; color: var(--text-muted);">Loop Interval:</label>
+        <select id="interval-input" class="btn" style="background-color: var(--bg-input); text-align: left;">
+          <option value="1">1 Minute</option>
+          <option value="5" selected>5 Minutes</option>
+          <option value="10">10 Minutes</option>
+          <option value="15">15 Minutes</option>
+          <option value="20">20 Minutes</option>
+          <option value="30">30 Minutes</option>
+          <option value="45">45 Minutes</option>
+          <option value="60">1 Hour</option>
+        </select>
+        <button type="submit" class="btn btn-active">Update Node</button>
+      </form>
+    </section>
+
+    <main>
+      <div class="chart-container">
+        <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--accent);">Temperature Spectrum (°C)</h3>
+        <div style="position: relative; height: 300px;">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--success);">Relative Humidity Profile (%)</h3>
+        <div style="position: relative; height: 300px;">
+          <canvas id="humidChart"></canvas>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script src="js/sensor-render.js"></script>
+</body>
+</html>
