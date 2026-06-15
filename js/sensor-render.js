@@ -1,25 +1,22 @@
 let tempChart = null;
 let humidChart = null;
 let currentSensorId = null;
+let activeHours = 48; // 🟢 NEW: Global state tracker to remember the active chart view window
 
 document.addEventListener("DOMContentLoaded", () => {
   // 1. Parse the URL string to extract the target sensor identity
   const urlParams = new URLSearchParams(window.location.search);
-  
-  // 🟢 FIXED: Changed from "id" to "sensor" to match your dashboard's URL format
   currentSensorId = urlParams.get("sensor");
 
   // If no ID is provided, gracefully downgrade to a dummy node instead of failing
   if (!currentSensorId) {
     currentSensorId = "demo_node";
-    // 🟢 FIXED: Updated fallback query string to match unified format
     const cleanUrl = `${window.location.pathname}?sensor=${currentSensorId}`;
     window.history.replaceState(null, "", cleanUrl);
   }
 
   // Set the structural labels on the page
   let publicTitle = currentSensorId;
-
   if (currentSensorId === "demo_node") {
     publicTitle = "Demo Sensor Page (Fake Sensor Page for Dev Purposes)";
   }
@@ -27,8 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Push the clean title to the HTML template
   document.getElementById("display-sensor-id").textContent = publicTitle;
 
-  // 2. Initialize Telemetry Load (Defaulting to a 48-hour window)
-  fetchTelemetryData(48);
+  // 2. Initialize Telemetry Load (Using the default state)
+  fetchTelemetryData(activeHours);
 
   // 3. Set up Event Listeners for the Time Window Filters
   document.querySelectorAll("[data-window]").forEach(button => {
@@ -36,8 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll("[data-window]").forEach(b => b.classList.remove("btn-active"));
       e.target.classList.add("btn-active");
       
-      const hours = parseInt(e.target.getAttribute("data-window"));
-      fetchTelemetryData(hours);
+      // 🟢 FIX: Update the global state so background loops pull the correct window scale
+      activeHours = parseInt(e.target.getAttribute("data-window"));
+      fetchTelemetryData(activeHours);
     });
   });
 
@@ -46,6 +44,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (intervalForm) {
     intervalForm.addEventListener("submit", handleIntervalUpdate);
   }
+
+  // 5. 🟢 THE AUTO-REFRESH TIMER: Safely pull fresh database strings every 30 seconds
+  setInterval(() => {
+    console.log(`[Sensor Sync] Auto-refreshing data pipeline for window: ${activeHours} Hours...`);
+    fetchTelemetryData(activeHours);
+  }, 30000);
 });
 
 /**
@@ -64,7 +68,7 @@ async function fetchTelemetryData(hours) {
     const data = await response.json();
     
     if (data.length === 0) {
-      updateMetricDisplays("---", "---", null); // 🟢 Added empty state parameter
+      updateMetricDisplays("---", "---", null); 
       return;
     }
 
@@ -86,7 +90,6 @@ function processAndRender(data) {
   // Pull the latest row entries for the real-time summary header cards
   const latestRecord = data[data.length - 1];
   
-  // 🟢 FIXED: Added the record timestamp as a third argument to keep UI elements synced
   updateMetricDisplays(latestRecord.temperature, latestRecord.humidity, latestRecord.timestamp);
 
   // Prepare arrays for Chart.js parsing
@@ -97,7 +100,7 @@ function processAndRender(data) {
   // Build or refresh visual charts
   renderCharts(timestamps, temperatures, humidities);
 }
-// EXTENDED: Accepts the time string and splits it across both date and time display targets
+
 function updateMetricDisplays(t, h, time) {
   document.getElementById("live-temp").textContent = typeof t === "number" ? `${t.toFixed(1)}°C` : t;
   document.getElementById("live-humid").textContent = typeof h === "number" ? `${h.toFixed(1)}%` : h;
@@ -113,7 +116,7 @@ function updateMetricDisplays(t, h, time) {
     }
   }
 
-  // 🟢 NEW: Extract separate Date and Time parameters for the centralized layout block
+  // Extract separate Date and Time parameters for the centralized layout block
   const dateBlock = document.getElementById("sync-date");
   const timeBlock = document.getElementById("sync-time");
   
@@ -126,6 +129,7 @@ function updateMetricDisplays(t, h, time) {
     if (timeBlock) timeBlock.textContent = "--:--:--";
   }
 }
+
 /**
  * Instantiates and updates the dual decoupled Chart.js graph components
  */
@@ -143,7 +147,7 @@ function renderCharts(labels, tempPoints, humidPoints) {
   if (tempChart) {
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = tempPoints;
-    tempChart.update();
+    tempChart.update('none'); // 🟢 'none' prevents distracting animation jumps during silent data flashes
   } else {
     const ctx = document.getElementById("tempChart").getContext("2d");
     tempChart = new Chart(ctx, {
@@ -156,7 +160,7 @@ function renderCharts(labels, tempPoints, humidPoints) {
   if (humidChart) {
     humidChart.data.labels = labels;
     humidChart.data.datasets[0].data = humidPoints;
-    humidChart.update();
+    humidChart.update('none'); // 🟢 Optimizes update cycle rendering performance
   } else {
     const ctx = document.getElementById("humidChart").getContext("2d");
     humidChart = new Chart(ctx, {
@@ -196,7 +200,7 @@ async function handleIntervalUpdate(e) {
  */
 function generateMockData(hours) {
   const mockArray = [];
-  const totalPoints = hours * 4; // Simulated data entry every 15 minutes
+  const totalPoints = hours * 4; 
   const now = new Date();
 
   for (let i = totalPoints; i >= 0; i--) {
