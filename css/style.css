@@ -223,3 +223,16 @@ select.btn:hover {
   opacity: 0.6;
   cursor: wait;
 }
+
+/* Custom High-Action Primary CTA Modifier */
+.btn-primary-action {
+  background-color: var(--accent) !important; /* Uses your sky blue token */
+  color: var(--bg-main) !important;           /* Deep slate text for clear readability */
+  font-weight: 600;
+  border-radius: var(--radius-md);
+}
+
+.btn-primary-action:hover {
+  opacity: 0.85;
+  background-color: var(--accent) !important; /* Lock the base tint accent shape */
+}
