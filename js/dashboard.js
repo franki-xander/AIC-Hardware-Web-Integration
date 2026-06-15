@@ -5,19 +5,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dedicatedPageIntervalDisplay = document.getElementById("single-sensor-interval");
 
   // ==========================================================================
-  // VIEW 1: Main Menu Grid Layout Generator & Multi-Sensor Handler
+  // PHASE 1: Build HTML Layout Blueprints (Runs EXACTLY Once on Load)
   // ==========================================================================
-  async function renderAndFetchMainMenu() {
+  function initializeDashboardLayout() {
     if (!fleetGrid) return;
 
-    // 1. Wipe out placeholder text
+    // Wipe out initializing placeholder text once
     fleetGrid.innerHTML = "";
 
-    // 2. Programmatically generate anchor elements using native .card classes
+    // Programmatically generate anchor elements using native .card classes
     CONFIG.FLEET.forEach(device => {
       const card = document.createElement("a");
       card.className = "card"; 
-      card.setAttribute("data-sensor-id", device.id); // Holds "esp32_office_1"
+      card.setAttribute("data-sensor-id", device.id); 
       card.href = `sensor.html?sensor=${device.id}`;
       
       card.innerHTML = `
@@ -31,8 +31,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
       fleetGrid.appendChild(card);
     });
+  }
 
-    // 3. Query the freshly generated cards to fetch their live network telemetry data
+  // ==========================================================================
+  // PHASE 2: Live Network Telemetry Sync Loops (Runs repeatedly on a timer)
+  // ==========================================================================
+  async function fetchLiveFleetTelemetry() {
+    if (!fleetGrid) return;
+    
     const mainMenuCards = document.querySelectorAll(".card[data-sensor-id]");
     
     for (const card of mainMenuCards) {
@@ -41,7 +47,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!sensorId || !timeLabel) continue;
 
       try {
-        // 🟢 ALIGNED: Changed parameter from 'sensor_id=' to 'sensor=' to match system standards
         const response = await fetch(`${CONFIG.API_BASE_URL}?action=getConfig&sensor=${sensorId}`);
         const data = await response.json();
 
@@ -58,9 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ==========================================================================
-  // VIEW 2: Dedicated Singular Sensor Page View Handler
-  // ==========================================================================
+  // Dedicated Singular Sensor Page View Handler
   async function updateDedicatedPageStatus() {
     if (!dedicatedPageTimeDisplay) return;
 
@@ -68,16 +71,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sensorId = urlParams.get("sensor") || "esp32_office_1";
 
     try {
-      // 🟢 ALIGNED: Changed parameter from 'sensor_id=' to 'sensor=' to match system standards
       const response = await fetch(`${CONFIG.API_BASE_URL}?action=getConfig&sensor=${sensorId}`);
       const data = await response.json();
 
-      // Render Interval Configuration Setting
       if (dedicatedPageIntervalDisplay && data.command_interval) {
         dedicatedPageIntervalDisplay.innerText = `${data.command_interval} Minutes`;
       }
 
-      // Render Formatted Sync Block Value
       if (data.latest_reading && data.latest_reading !== "No data available") {
         const lastReadDate = new Date(data.latest_reading);
         dedicatedPageTimeDisplay.innerText = lastReadDate.toLocaleString();
@@ -90,7 +90,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Execute operational pipelines concurrently on DOM load initialization
-  renderAndFetchMainMenu();
-  updateDedicatedPageStatus();
+  // ==========================================================================
+  // EXECUTION & POLLING PIPELINE
+  // ==========================================================================
+  // 1. Setup layout frames instantly
+  initializeDashboardLayout();
+
+  // 2. Trigger immediate data population on launch
+  await Promise.all([fetchLiveFleetTelemetry(), updateDedicatedPageStatus()]);
+
+  // 3. 🟢 THE AUTO-REFRESH TRIGGER: Smooth background updates every 30 seconds
+  setInterval(async () => {
+    console.log("[Auto-Sync] Fetching latest cloud database records...");
+    await Promise.all([fetchLiveFleetTelemetry(), updateDedicatedPageStatus()]);
+  }, 30000); 
 });
