@@ -91,17 +91,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ==========================================================================
-  // EXECUTION & POLLING PIPELINE
+  // EXECUTION & POLLING PIPELINE (UPDATED: NON-BLOCKING)
   // ==========================================================================
-  // 1. Setup layout frames instantly
+  // 1. Build the physical HTML framework layout frames instantly
   initializeDashboardLayout();
 
-  // 2. Trigger immediate data population on launch
-  await Promise.all([fetchLiveFleetTelemetry(), updateDedicatedPageStatus()]);
-
-  // 3. 🟢 THE AUTO-REFRESH TRIGGER: Smooth background updates every 30 seconds
+  // 2. 🟢 FIX: Register the interval IMMEDIATELY so slow network fetches can't block it
   setInterval(async () => {
-    console.log("[Auto-Sync] Fetching latest cloud database records...");
+    console.log("[Auto-Sync] Asynchronous background polling loop spinning up...");
     await Promise.all([fetchLiveFleetTelemetry(), updateDedicatedPageStatus()]);
   }, 30000); 
+
+  // 3. 🟢 FIX: Fire the very first initial fetch safely without the "await" roadblock
+  console.log("[Initial Load] Dispatching network requests...");
+  Promise.all([fetchLiveFleetTelemetry(), updateDedicatedPageStatus()])
+    .then(() => console.log("[Initial Load] First wave of telemetry successfully populated."))
+    .catch(err => console.error("[Initial Load] Critical bootup fetch failure:", err));
 });
