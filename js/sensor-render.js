@@ -5,27 +5,27 @@ let currentSensorId = null;
 document.addEventListener("DOMContentLoaded", () => {
   // 1. Parse the URL string to extract the target sensor identity
   const urlParams = new URLSearchParams(window.location.search);
-  currentSensorId = urlParams.get("id");
+  
+  // 🟢 FIXED: Changed from "id" to "sensor" to match your dashboard's URL format
+  currentSensorId = urlParams.get("sensor");
 
-  // 👉 FIX: If no ID is provided, gracefully downgrade to a dummy node instead of failing
+  // If no ID is provided, gracefully downgrade to a dummy node instead of failing
   if (!currentSensorId) {
     currentSensorId = "demo_node";
-    // Cleanly updates the browser address bar to /sensor?id=demo_node without reloading the page
-    const cleanUrl = `${window.location.pathname}?id=${currentSensorId}`;
+    // 🟢 FIXED: Updated fallback query string to match unified format
+    const cleanUrl = `${window.location.pathname}?sensor=${currentSensorId}`;
     window.history.replaceState(null, "", cleanUrl);
   }
 
   // Set the structural labels on the page
-// Establish a user-friendly display title
-let publicTitle = currentSensorId;
+  let publicTitle = currentSensorId;
 
-if (currentSensorId === "demo_node") {
-  publicTitle = "Demo Sensor Page (Fake Sensor Page for Dev Purposes)"; // ◄ Change this text to whatever you want!
-}
+  if (currentSensorId === "demo_node") {
+    publicTitle = "Demo Sensor Page (Fake Sensor Page for Dev Purposes)";
+  }
 
-// Push the clean title to the HTML template
-document.getElementById("display-sensor-id").textContent = publicTitle;
-
+  // Push the clean title to the HTML template
+  document.getElementById("display-sensor-id").textContent = publicTitle;
 
   // 2. Initialize Telemetry Load (Defaulting to a 48-hour window)
   fetchTelemetryData(48);
@@ -53,7 +53,6 @@ document.getElementById("display-sensor-id").textContent = publicTitle;
  * or serves instant local mock data if the dummy sensor is active.
  */
 async function fetchTelemetryData(hours) {
-  // 👉 FIX: Generate instant dummy visuals for the demo node so deployment never looks broken
   if (currentSensorId === "demo_node") {
     const mockData = generateMockData(hours);
     processAndRender(mockData);
@@ -65,7 +64,7 @@ async function fetchTelemetryData(hours) {
     const data = await response.json();
     
     if (data.length === 0) {
-      updateMetricDisplays("---", "---");
+      updateMetricDisplays("---", "---", null); // 🟢 Added empty state parameter
       return;
     }
 
@@ -73,7 +72,6 @@ async function fetchTelemetryData(hours) {
 
   } catch (error) {
     console.error("Critical error fetching data telemetry:", error);
-    // Secondary fallback: If the live network fetch fails completely, show dummy data as a safety net
     processAndRender(generateMockData(hours));
   }
 }
@@ -87,7 +85,9 @@ function processAndRender(data) {
 
   // Pull the latest row entries for the real-time summary header cards
   const latestRecord = data[data.length - 1];
-  updateMetricDisplays(latestRecord.temperature, latestRecord.humidity);
+  
+  // 🟢 FIXED: Added the record timestamp as a third argument to keep UI elements synced
+  updateMetricDisplays(latestRecord.temperature, latestRecord.humidity, latestRecord.timestamp);
 
   // Prepare arrays for Chart.js parsing
   const timestamps = data.map(row => new Date(row.timestamp));
@@ -97,12 +97,35 @@ function processAndRender(data) {
   // Build or refresh visual charts
   renderCharts(timestamps, temperatures, humidities);
 }
-
-function updateMetricDisplays(t, h) {
+// EXTENDED: Accepts the time string and splits it across both date and time display targets
+function updateMetricDisplays(t, h, time) {
   document.getElementById("live-temp").textContent = typeof t === "number" ? `${t.toFixed(1)}°C` : t;
   document.getElementById("live-humid").textContent = typeof h === "number" ? `${h.toFixed(1)}%` : h;
-}
 
+  // Header subtitle text indicator
+  const timeElement = document.getElementById("single-sensor-latest-time");
+  if (timeElement) {
+    if (time) {
+      const lastReadDate = new Date(time);
+      timeElement.textContent = `Last Sync: ${lastReadDate.toLocaleString()}`;
+    } else {
+      timeElement.textContent = "Last Sync: No historical payload entry found";
+    }
+  }
+
+  // 🟢 NEW: Extract separate Date and Time parameters for the centralized layout block
+  const dateBlock = document.getElementById("sync-date");
+  const timeBlock = document.getElementById("sync-time");
+  
+  if (time) {
+    const lastReadDate = new Date(time);
+    if (dateBlock) dateBlock.textContent = lastReadDate.toLocaleDateString();
+    if (timeBlock) timeBlock.textContent = lastReadDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } else {
+    if (dateBlock) dateBlock.textContent = "--/--/----";
+    if (timeBlock) timeBlock.textContent = "--:--:--";
+  }
+}
 /**
  * Instantiates and updates the dual decoupled Chart.js graph components
  */
@@ -169,7 +192,7 @@ async function handleIntervalUpdate(e) {
 }
 
 /**
- * 👉 NEW: Algorithmic generator that builds mathematically smooth simulation metrics
+ * Algorithmic generator that builds mathematically smooth simulation metrics
  */
 function generateMockData(hours) {
   const mockArray = [];
@@ -179,7 +202,6 @@ function generateMockData(hours) {
   for (let i = totalPoints; i >= 0; i--) {
     const timeOffset = new Date(now.getTime() - i * 15 * 60 * 1000);
     
-    // Generates standard, realistic oscillating wave structures for temperatures and humidity
     const waveFactor = Math.sin(i * 0.1);
     const simulatedTemp = 24.5 + (waveFactor * 3.2) + (Math.random() * 0.4);
     const simulatedHumid = 55.0 - (waveFactor * 8.5) + (Math.random() * 1.2);
