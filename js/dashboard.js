@@ -10,17 +10,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function renderAndFetchMainMenu() {
     if (!fleetGrid) return;
 
-    // 1. Wipe out the "Initializing device fleet mapping matrix..." placeholder text
+    // 1. Wipe out placeholder text
     fleetGrid.innerHTML = "";
 
     // 2. Programmatically generate anchor elements using native .card classes
     CONFIG.FLEET.forEach(device => {
       const card = document.createElement("a");
-      card.className = "card"; // 🟢 Matches your exact layout token class rule inside style.css
-      card.setAttribute("data-sensor-id", device.id);
+      card.className = "card"; 
+      card.setAttribute("data-sensor-id", device.id); // Holds "esp32_office_1"
       card.href = `sensor.html?sensor=${device.id}`;
       
-      // Structural inner card spacing tweaks utilizing theme variables
       card.innerHTML = `
         <h3 style="font-size: 1.25rem; font-weight: 700;">${device.name}</h3>
         <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0.25rem 0 1.5rem 0;">
@@ -42,7 +41,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!sensorId || !timeLabel) continue;
 
       try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}?action=getConfig&sensor_id=${sensorId}`);
+        // 🟢 ALIGNED: Changed parameter from 'sensor_id=' to 'sensor=' to match system standards
+        const response = await fetch(`${CONFIG.API_BASE_URL}?action=getConfig&sensor=${sensorId}`);
         const data = await response.json();
 
         if (data.latest_reading && data.latest_reading !== "No data available") {
@@ -68,7 +68,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sensorId = urlParams.get("sensor") || "esp32_office_1";
 
     try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}?action=getConfig&sensor_id=${sensorId}`);
+      // 🟢 ALIGNED: Changed parameter from 'sensor_id=' to 'sensor=' to match system standards
+      const response = await fetch(`${CONFIG.API_BASE_URL}?action=getConfig&sensor=${sensorId}`);
       const data = await response.json();
 
       // Render Interval Configuration Setting
