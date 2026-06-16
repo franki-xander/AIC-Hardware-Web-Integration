@@ -1,145 +1,100 @@
 let tempChart = null;
 let humidChart = null;
 let currentSensorId = null;
-let activeHours = 48; // 🟢 NEW: Global state tracker to remember the active chart view window
+let activeHours = 48;
 
 document.addEventListener("DOMContentLoaded", () => {
-  // 1. Parse the URL string to extract the target sensor identity
   const urlParams = new URLSearchParams(window.location.search);
   currentSensorId = urlParams.get("sensor");
 
-  // If no ID is provided, gracefully downgrade to a dummy node instead of failing
   if (!currentSensorId) {
     currentSensorId = "demo_node";
-    const cleanUrl = `${window.location.pathname}?sensor=${currentSensorId}`;
-    window.history.replaceState(null, "", cleanUrl);
+    window.history.replaceState(null, "", `${window.location.pathname}?sensor=${currentSensorId}`);
   }
 
-  // Set the structural labels on the page
-  let publicTitle = currentSensorId;
-  if (currentSensorId === "demo_node") {
-    publicTitle = "Demo Sensor Page (Fake Sensor Page for Dev Purposes)";
-  }
+  document.getElementById("display-sensor-id").textContent =
+    currentSensorId === "demo_node"
+      ? "Demo Sensor Page (Fake Sensor Page for Dev Purposes)"
+      : currentSensorId;
 
-  // Push the clean title to the HTML template
-  document.getElementById("display-sensor-id").textContent = publicTitle;
-
-  // 2. Initialize Telemetry Load (Using the default state)
   fetchTelemetryData(activeHours);
 
-  // 3. Set up Event Listeners for the Time Window Filters
   document.querySelectorAll("[data-window]").forEach(button => {
     button.addEventListener("click", (e) => {
       document.querySelectorAll("[data-window]").forEach(b => b.classList.remove("btn-active"));
       e.target.classList.add("btn-active");
-      
-      // 🟢 FIX: Update the global state so background loops pull the correct window scale
       activeHours = parseInt(e.target.getAttribute("data-window"));
       fetchTelemetryData(activeHours);
     });
   });
 
-  // 4. Set up Event Listener for the Interval Update Submission
   const intervalForm = document.getElementById("interval-form");
-  if (intervalForm) {
-    intervalForm.addEventListener("submit", handleIntervalUpdate);
-  }
+  if (intervalForm) intervalForm.addEventListener("submit", handleIntervalUpdate);
 
-  // 5. 🟢 THE AUTO-REFRESH TIMER: Safely pull fresh database strings every 30 seconds
   setInterval(() => {
-    console.log(`[Sensor Sync] Auto-refreshing data pipeline for window: ${activeHours} Hours...`);
     fetchTelemetryData(activeHours);
   }, 30000);
 });
 
-/**
- * Communicates with Google Apps Script to fetch historical records,
- * or serves instant local mock data if the dummy sensor is active.
- */
 async function fetchTelemetryData(hours) {
   if (currentSensorId === "demo_node") {
-    const mockData = generateMockData(hours);
-    processAndRender(mockData);
+    processAndRender(generateMockData(hours));
     return;
   }
-
   try {
     const response = await fetch(`${CONFIG.API_BASE_URL}?action=getData&sensor_id=${currentSensorId}&hours=${hours}`);
     const data = await response.json();
-    
-    if (data.length === 0) {
-      updateMetricDisplays("---", "---", null); 
-      return;
-    }
-
+    if (data.length === 0) { updateMetricDisplays("---", "---", null); return; }
     processAndRender(data);
-
-  } catch (error) {
-    console.error("Critical error fetching data telemetry:", error);
+  } catch {
     processAndRender(generateMockData(hours));
   }
 }
 
-/**
- * Universal layout mapping parsing engine
- */
 function processAndRender(data) {
-  // Sort chronologically by timestamp
   data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-  // Pull the latest row entries for the real-time summary header cards
-  const latestRecord = data[data.length - 1];
-  
-  updateMetricDisplays(latestRecord.temperature, latestRecord.humidity, latestRecord.timestamp);
-
-  // Prepare arrays for Chart.js parsing
-  const timestamps = data.map(row => new Date(row.timestamp));
-  const temperatures = data.map(row => row.temperature);
-  const humidities = data.map(row => row.humidity);
-
-  // Build or refresh visual charts
-  renderCharts(timestamps, temperatures, humidities);
+  const latest = data[data.length - 1];
+  updateMetricDisplays(latest.temperature, latest.humidity, latest.timestamp);
+  renderCharts(
+    data.map(r => new Date(r.timestamp)),
+    data.map(r => r.temperature),
+    data.map(r => r.humidity)
+  );
 }
 
 function updateMetricDisplays(t, h, time) {
-  document.getElementById("live-temp").textContent = typeof t === "number" ? `${t.toFixed(1)}°C` : t;
-  document.getElementById("live-humid").textContent = typeof h === "number" ? `${h.toFixed(1)}%` : h;
+  document.getElementById("live-temp").textContent  = typeof t === "number" ? `${t.toFixed(1)}°C` : t;
+  document.getElementById("live-humid").textContent = typeof h === "number" ? `${h.toFixed(1)}%`  : h;
 
-  // Header subtitle text indicator
-  const timeElement = document.getElementById("single-sensor-latest-time");
-  if (timeElement) {
-    if (time) {
-      const lastReadDate = new Date(time);
-      timeElement.textContent = `Last Sync: ${lastReadDate.toLocaleString()}`;
-    } else {
-      timeElement.textContent = "Last Sync: No historical payload entry found";
-    }
-  }
+  const timeEl = document.getElementById("single-sensor-latest-time");
+  if (timeEl) timeEl.textContent = time ? `Last Sync: ${new Date(time).toLocaleString()}` : "Last Sync: No historical payload entry found";
 
-  // Extract separate Date and Time parameters for the centralized layout block
   const dateBlock = document.getElementById("sync-date");
   const timeBlock = document.getElementById("sync-time");
-  
   if (time) {
-    const lastReadDate = new Date(time);
-    if (dateBlock) dateBlock.textContent = lastReadDate.toLocaleDateString();
-    if (timeBlock) timeBlock.textContent = lastReadDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const d = new Date(time);
+    if (dateBlock) dateBlock.textContent = d.toLocaleDateString();
+    if (timeBlock) timeBlock.textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   } else {
     if (dateBlock) dateBlock.textContent = "--/--/----";
     if (timeBlock) timeBlock.textContent = "--:--:--";
   }
+
+  // Update the Current Interval display (value only — the "minutes" label is in HTML)
+  const intervalDisplay = document.getElementById("single-sensor-interval");
+  if (intervalDisplay && intervalDisplay.textContent === "—") {
+    // dashboard.js updateDedicatedPageStatus() populates this on load;
+    // we only overwrite the placeholder if it hasn't been set yet.
+  }
 }
 
-/**
- * Instantiates and updates the dual decoupled Chart.js graph components
- */
 function renderCharts(labels, tempPoints, humidPoints) {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      x: { type: 'time', grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-      y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+      x: { type: "time", grid: { color: "#334155" }, ticks: { color: "#94a3b8" } },
+      y: { grid: { color: "#334155" }, ticks: { color: "#94a3b8" } }
     },
     plugins: { legend: { display: false } }
   };
@@ -147,10 +102,9 @@ function renderCharts(labels, tempPoints, humidPoints) {
   if (tempChart) {
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = tempPoints;
-    tempChart.update('none'); // 🟢 'none' prevents distracting animation jumps during silent data flashes
+    tempChart.update("none");
   } else {
-    const ctx = document.getElementById("tempChart").getContext("2d");
-    tempChart = new Chart(ctx, {
+    tempChart = new Chart(document.getElementById("tempChart").getContext("2d"), {
       type: "line",
       data: { labels, datasets: [{ data: tempPoints, borderColor: "#38bdf8", tension: 0.2, pointRadius: 1 }] },
       options: chartOptions
@@ -160,10 +114,9 @@ function renderCharts(labels, tempPoints, humidPoints) {
   if (humidChart) {
     humidChart.data.labels = labels;
     humidChart.data.datasets[0].data = humidPoints;
-    humidChart.update('none'); // 🟢 Optimizes update cycle rendering performance
+    humidChart.update("none");
   } else {
-    const ctx = document.getElementById("humidChart").getContext("2d");
-    humidChart = new Chart(ctx, {
+    humidChart = new Chart(document.getElementById("humidChart").getContext("2d"), {
       type: "line",
       data: { labels, datasets: [{ data: humidPoints, borderColor: "#4ade80", tension: 0.2, pointRadius: 1 }] },
       options: chartOptions
@@ -171,50 +124,40 @@ function renderCharts(labels, tempPoints, humidPoints) {
   }
 }
 
-/**
- * Fires an outbound request back to Google to save a new transmission interval
- */
 async function handleIntervalUpdate(e) {
   e.preventDefault();
   const inputVal = document.getElementById("interval-input").value;
-  
+
   if (currentSensorId === "demo_node") {
+    // Update the display immediately in demo mode
+    const intervalDisplay = document.getElementById("single-sensor-interval");
+    if (intervalDisplay) intervalDisplay.textContent = inputVal;
     alert(`Demo Mode: Simulated interval switch to ${inputVal} minutes.`);
     return;
   }
-  
+
   try {
     const response = await fetch(`${CONFIG.API_BASE_URL}?action=setInterval&sensor_id=${currentSensorId}&value=${inputVal}`);
-    const result = await response.json();
-    
+    const result   = await response.json();
     if (result.status === "updated") {
+      // Reflect the new value in the Current Interval display immediately
+      const intervalDisplay = document.getElementById("single-sensor-interval");
+      if (intervalDisplay) intervalDisplay.textContent = inputVal;
       alert(`Success: Interval for ${currentSensorId} set to ${inputVal} minutes.`);
     }
-  } catch (error) {
+  } catch {
     alert("Failed to sync structural interval settings with backend.");
   }
 }
 
-/**
- * Algorithmic generator that builds mathematically smooth simulation metrics
- */
 function generateMockData(hours) {
-  const mockArray = [];
-  const totalPoints = hours * 4; 
+  const arr = [];
+  const total = hours * 4;
   const now = new Date();
-
-  for (let i = totalPoints; i >= 0; i--) {
-    const timeOffset = new Date(now.getTime() - i * 15 * 60 * 1000);
-    
-    const waveFactor = Math.sin(i * 0.1);
-    const simulatedTemp = 24.5 + (waveFactor * 3.2) + (Math.random() * 0.4);
-    const simulatedHumid = 55.0 - (waveFactor * 8.5) + (Math.random() * 1.2);
-
-    mockArray.push({
-      timestamp: timeOffset.toISOString(),
-      temperature: simulatedTemp,
-      humidity: simulatedHumid
-    });
+  for (let i = total; i >= 0; i--) {
+    const t = new Date(now.getTime() - i * 15 * 60 * 1000);
+    const w = Math.sin(i * 0.1);
+    arr.push({ timestamp: t.toISOString(), temperature: 24.5 + w * 3.2 + Math.random() * 0.4, humidity: 55.0 - w * 8.5 + Math.random() * 1.2 });
   }
-  return mockArray;
+  return arr;
 }
